@@ -113,12 +113,13 @@ class CustomALIF(Cell):
 
             self._num_units = self.n_rec
 
+            # size: n_rec
             self.tau = tau
             self._decay = tf.exp(-dt / tau)
             self.thr = thr
 
             with tf.variable_scope('InputWeights'):
-                # Input weights
+                # Input weights: size n_in, n_rec
                 init_w_in_var = w_in_init if w_in_init is not None else \
                     (rd.randn(n_in, n_rec) / np.sqrt(n_in)).astype(np.float32)
                 self.w_in_var = tf.get_variable("InputWeight", initializer=init_w_in_var, dtype=dtype)
@@ -126,17 +127,19 @@ class CustomALIF(Cell):
 
             with tf.variable_scope('RecWeights'):
                 if rec:
+                    # Recurrent weights: size n_rec, n_rec
                     init_w_rec_var = w_rec_init if w_rec_init is not None else \
                         (rd.randn(n_rec, n_rec) / np.sqrt(n_rec)).astype(np.float32)
                     self.w_rec_var = tf.get_variable('RecurrentWeight', initializer=init_w_rec_var, dtype=dtype)
                     self.w_rec_val = self.w_rec_var
 
-                    self.recurrent_disconnect_mask = np.diag(np.ones(n_rec, dtype=bool))
-
                     # Disconnect autotapse
+                    self.recurrent_disconnect_mask = np.diag(np.ones(n_rec, dtype=bool))
                     self.w_rec_val = tf.where(self.recurrent_disconnect_mask, tf.zeros_like(self.w_rec_val),self.w_rec_val)
 
+                    # all ones except on the self connections: size n_rec, n_rec
                     dw_val_dw_var_rec = np.ones((self._num_units,self._num_units)) - np.diag(np.ones(self._num_units))
+            # all ones: size n_in, n_rec
             dw_val_dw_var_in = np.ones((n_in,self._num_units))
 
             self.dw_val_dw_var = [dw_val_dw_var_in, dw_val_dw_var_rec] if rec else [dw_val_dw_var_in,]
@@ -161,9 +164,12 @@ class CustomALIF(Cell):
 
     @property
     def output_size(self):
-        return [self.n_rec, tf.TensorShape((self.n_rec, 2)),
-                [tf.TensorShape((self.n_rec, 2, 2)), tf.TensorShape((self.n_rec, 2))],
-                [tf.TensorShape((self.n_rec, 2))] * 2]
+        return [
+            self.n_rec,
+            tf.TensorShape((self.n_rec, 2)),
+            [tf.TensorShape((self.n_rec, 2, 2)), tf.TensorShape((self.n_rec, 2))],
+            [tf.TensorShape((self.n_rec, 2))] * 2
+        ]
 
     def zero_state(self, batch_size, dtype, n_rec=None):
         if n_rec is None: n_rec = self.n_rec
@@ -184,17 +190,23 @@ class CustomALIF(Cell):
 
         decay = self._decay
 
+        # z, v, b are all of size n_batch x n_neurons
         z = state.z
         s = state.s
         v, b = s[..., 0], s[..., 1]
 
+        # spikes without refractory mechanism?
         old_z = self.compute_z(v, b)
 
+        # TODO: not implemented
         if self.stop_gradients:
             z = tf.stop_gradient(z)
 
+        # adaptive threshold gets updated as though a spike had occurred although the refractory mechanism prevents
+        # this from happening in reality?
         new_b = self.decay_b * b + old_z
 
+        # Input current
         if len(self.w_in_val.get_shape().as_list()) == 3:
             i_in = tf.einsum('bi,bij->bj', inputs, self.w_in_val)
         else:
@@ -208,9 +220,12 @@ class CustomALIF(Cell):
         else:
             i_t = i_in
 
+        # reset current based on actual spike state from previous timestep
         I_reset = z * self.thr * self.dt
 
         new_v = decay * v + i_t - I_reset
+
+        # why are the (1-decay) terms missing in the update for b and v? Scaled with other terms
 
         # Spike generation
         is_refractory = tf.greater(state.r, .1)
@@ -218,6 +233,7 @@ class CustomALIF(Cell):
         new_z = tf.where(is_refractory, zeros_like_spikes, self.compute_z(new_v, new_b))
         new_r = tf.clip_by_value(state.r + self.n_refractory * new_z - 1,
                                  0., float(self.n_refractory))
+        # creates a new dimension?
         new_s = tf.stack((new_v, new_b), axis=-1)
 
         def safe_grad(y, x):

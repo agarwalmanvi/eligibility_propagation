@@ -10,11 +10,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from struct import unpack
 
-DATA_PATH = '../datasets/timit'
-TMP_PATH = '/tmp/timit_processing'
-OUTPUT_PATH = '../datasets/timit_processed'
+# DATA_PATH = '../datasets/timit'
+DATA_PATH = '/tungstenfs/scratch/gzenke/agarmanv/data/TIMIT'
+# TMP_PATH = '/tmp/timit_processing'
+TMP_PATH = '/ereborfs/agarmanv/tmp/timit_processing'
+# OUTPUT_PATH = '../datasets/timit_processed'
+OUTPUT_PATH = '/tungstenfs/scratch/gzenke/agarmanv/data/TIMIT_processed'
 
-interactive_plot_histogram = True
+interactive_plot_histogram = False
 exclude_sa_files = True
 normalize_over_training_set = True
 
@@ -26,8 +29,13 @@ SAMPLING_RATE = 16000
 window_step_in_samples = int(window_step_in_second*SAMPLING_RATE)+1
 
 dataset_sources = ['train','test', 'test']
+# dataset_sources = [i.upper() for i in dataset_sources]
+
 dataset_targets = ['train','test','develop']
+# dataset_targets = [i.upper() for i in dataset_targets]
+
 drs = ['dr'+str(i) for i in range(1,n_drs +1)]
+# drs = [i.upper() for i in drs]
 
 reduced_phn_list = ['sil']
 phn_list = ['h#']
@@ -85,6 +93,8 @@ develop_selection = [
 'dr3/mbwm0',
 'dr3/mthc0',]
 
+# develop_selection = [i.upper() for i in develop_selection]
+
 core_test_selection = [
 'dr2/fpas0',
 'dr2/mtas1',
@@ -111,6 +121,8 @@ core_test_selection = [
 'dr3/mjmp0',
 'dr3/mlnt0',
 ]
+
+# core_test_selection = [i.upper() for i in core_test_selection]
 
 phonem_reduction_table = {
     # according to graves phd
@@ -331,11 +343,16 @@ if __name__ == '__main__':
                     mfccs,fbanks,wav,FS = process_wav(speaker_path,wav_file)
 
                     htk_path = os.path.join(speaker_path, wav_file[:-3] + 'htk')
+                    # print(htk_path, os.path.isfile(htk_path))
+                    # import sys
+                    # sys.exit()
                     if os.path.isfile(htk_path):  # prepare HTK features only if available
                         htk_feats, _, _ = process_htk(htk_path)
                         htk_feats = np.pad(htk_feats, ((0, 1), (0, 0)), mode='edge')
                         assert mfccs.shape[0] == htk_feats.shape[0]
                         htk_stack.append(htk_feats)
+                    else:
+                        print("WTF htk file not found for ", htk_path)
 
                     duration = (sample_end - sample_start) / SAMPLING_RATE
                     meta_data = {'dr': dr,

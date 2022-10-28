@@ -50,3 +50,7 @@ python tutorial_evidence_accumulation_with_alif.py
 
 Warning: After installation, if your computer is equipped with a GPU, you might want to reinstall
 the gpu-compatible version of tensorflow.
+
+Note: for fig 2, python-speech-features is not available from pip (as was specified in the requirements.txt file) so I had to install it manually with: `conda install -c contango python_speech_features`.
+To run timi
+Also had to install pkg `sphfile` with `pip install sphfile`

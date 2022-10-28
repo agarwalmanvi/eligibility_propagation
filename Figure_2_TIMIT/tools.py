@@ -156,6 +156,8 @@ class TimitDataset:
             self.feature_stack_test = add_derivatives(self.feature_stack_test)
             self.feature_stack_develop = add_derivatives(self.feature_stack_develop)
 
+        print(self.feature_stack_train.shape)
+
         # normalize the features
         concatenated_training_features = np.concatenate(self.feature_stack_train,axis=0)
         means = np.mean(concatenated_training_features,axis=0)
